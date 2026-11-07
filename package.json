@@ -1,0 +1,17 @@
+{
+  "name": "jarvis",
+  "private": true,
+  "version": "0.1.0",
+  "description": "JARVIS — assistente pessoal holográfico (PWA + backend Node.js)",
+  "workspaces": [
+    "web",
+    "server"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace web",
+    "dev:server": "npm run dev --workspace server",
+    "build": "npm run build --workspace web && npm run build --workspace server",
+    "preview": "npm run preview --workspace web",
+    "typecheck": "npm run typecheck --workspace web && npm run typecheck --workspace server"
+  }
+}
