@@ -1,0 +1,27 @@
+# Blueprint do Render: um único serviço HTTPS com backend + PWA (mesma origem).
+# Render → New → Blueprint → selecione este repositório.
+# Preencha os segredos marcados com sync: false no painel (nunca no Git).
+services:
+  - type: web
+    name: jarvis
+    runtime: node
+    plan: free
+    branch: claude/jarvis-holographic-assistant-ouag4l
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm start --workspace server
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: 22
+      - key: OWNER_NAME
+        value: Charles
+      - key: OPENAI_REALTIME_MODEL
+        value: gpt-realtime
+      - key: OPENAI_REALTIME_VOICE
+        value: cedar
+      - key: ALLOWED_ORIGINS
+        value: https://charlesrtancredo.github.io
+      - key: ACCESS_CODE
+        generateValue: true
+      - key: OPENAI_API_KEY
+        sync: false
