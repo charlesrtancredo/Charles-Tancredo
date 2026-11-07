@@ -9,13 +9,14 @@ interface Props {
   onCoreTap?: () => void;
   onFps?: (fps: number) => void;
   onError?: () => void;
+  getLevel?: () => number | null;
 }
 
-export function HoloCanvas({ state, focusRef, onCoreTap, onFps, onError }: Props) {
+export function HoloCanvas({ state, focusRef, onCoreTap, onFps, onError, getLevel }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<HoloEngine | null>(null);
-  const cbs = useRef({ onCoreTap, onFps });
-  cbs.current = { onCoreTap, onFps };
+  const cbs = useRef({ onCoreTap, onFps, getLevel });
+  cbs.current = { onCoreTap, onFps, getLevel };
 
   useEffect(() => {
     const canvas = canvasRef.current!;
@@ -24,6 +25,7 @@ export function HoloCanvas({ state, focusRef, onCoreTap, onFps, onError }: Props
       engine = new HoloEngine(canvas, {
         onCoreTap: () => cbs.current.onCoreTap?.(),
         onFps: (f) => cbs.current.onFps?.(f),
+        getLevel: () => cbs.current.getLevel?.() ?? null,
       });
     } catch (err) {
       console.error('WebGL indisponível', err);

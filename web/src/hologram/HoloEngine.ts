@@ -17,6 +17,8 @@ import { STATE_PARAMS, cloneParams, lerpParams, type VisualParams } from './stat
 export interface HoloEngineOptions {
   onCoreTap?: () => void;
   onFps?: (fps: number) => void;
+  /** Nível de áudio real (0..1) a cada quadro; `null` usa envelope simulado. */
+  getLevel?: () => number | null;
 }
 
 interface RingSpec {
@@ -71,7 +73,7 @@ export class HoloEngine {
   private camera: THREE.PerspectiveCamera;
   private composer: EffectComposer;
   private bloom: UnrealBloomPass;
-  private clock = new THREE.Clock();
+  private lastFrame = performance.now();
   private raf = 0;
   private disposed = false;
 
@@ -90,10 +92,10 @@ export class HoloEngine {
   private rays: { geo: THREE.BufferGeometry; colors: Float32Array; seeds: Float32Array };
   private grid: THREE.Group;
   private hitSphere: THREE.Mesh;
+  private shock: { mesh: THREE.Mesh; mat: THREE.ShaderMaterial; t: number }[] = [];
 
   private state: AssistantState = 'idle';
   private params: VisualParams = cloneParams(STATE_PARAMS.idle);
-  private externalLevel: number | null = null;
   private level = 0;
   private time = 0;
 
@@ -354,6 +356,31 @@ export class HoloEngine {
       this.scene.add(beam);
     }
 
+    // Ondas de choque disparadas na troca de estado
+    for (let i = 0; i < 2; i++) {
+      const mat = new THREE.ShaderMaterial({
+        vertexShader: ringVertex,
+        fragmentShader: ringFragment,
+        uniforms: {
+          uColor: { value: new THREE.Color(0x8ff4ff) },
+          uRot: { value: 0 },
+          uSegments: { value: i === 0 ? 1 : 48 },
+          uFill: { value: i === 0 ? 1 : 0.55 },
+          uArc: { value: 1 },
+          uOpacity: { value: 0 },
+          uInner: { value: 0.96 },
+          uOuter: { value: 1.0 },
+        },
+        transparent: true,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      });
+      const mesh = new THREE.Mesh(new THREE.RingGeometry(0.96, 1.0, 192, 1), mat);
+      mesh.visible = false;
+      this.ringGroup.add(mesh);
+      this.shock.push({ mesh, mat, t: 1 });
+    }
+
     // Esfera invisível para detectar toque no núcleo
     this.hitSphere = new THREE.Mesh(new THREE.SphereGeometry(1.45, 16, 16), new THREE.MeshBasicMaterial({ visible: false }));
     this.rig.add(this.hitSphere);
@@ -373,12 +400,10 @@ export class HoloEngine {
   // ---------- API pública ----------
 
   setState(state: AssistantState) {
+    if (state === this.state) return;
     this.state = state;
-  }
-
-  /** Nível de áudio real (0..1). `null` = usa envelope simulado. */
-  setLevel(level: number | null) {
-    this.externalLevel = level;
+    // Dispara as ondas de choque (a segunda com leve atraso).
+    this.shock.forEach((s, i) => (s.t = -i * 0.12));
   }
 
   /** Define a região da tela (px CSS) onde o núcleo deve ficar centralizado. */
@@ -472,7 +497,7 @@ export class HoloEngine {
     if (document.hidden) {
       cancelAnimationFrame(this.raf);
     } else if (!this.disposed) {
-      this.clock.getDelta();
+      this.lastFrame = performance.now();
       this.raf = requestAnimationFrame(this.loop);
     }
   };
@@ -517,7 +542,9 @@ export class HoloEngine {
   private loop() {
     if (this.disposed) return;
     this.raf = requestAnimationFrame(this.loop);
-    const dt = Math.min(this.clock.getDelta(), 0.05);
+    const nowMs = performance.now();
+    const dt = Math.min((nowMs - this.lastFrame) / 1000, 0.05);
+    this.lastFrame = nowMs;
     const speedK = this.reducedMotion ? 0.35 : 1;
     this.time += dt * speedK;
     const t = this.time;
@@ -535,7 +562,8 @@ export class HoloEngine {
     const p = this.params;
     lerpParams(p, STATE_PARAMS[this.state], 1 - Math.exp(-dt * 3.2));
 
-    const targetLevel = this.externalLevel ?? this.simulatedLevel(t);
+    const real = this.opts.getLevel?.();
+    const targetLevel = real != null ? Math.min(1, real) * 0.85 : this.simulatedLevel(t);
     this.level += (targetLevel - this.level) * (1 - Math.exp(-dt * 14));
     const lvl = this.level;
 
@@ -549,7 +577,7 @@ export class HoloEngine {
     cu.uLevel.value = lvl * (this.state === 'speaking' || this.state === 'listening' ? 1 : 0.3);
     (cu.uColor.value as THREE.Color).setRGB(...p.color);
     (cu.uAccent.value as THREE.Color).setRGB(...p.accent);
-    cu.uIntensity.value = p.coreIntensity * (1 + lvl * 0.35);
+    cu.uIntensity.value = p.coreIntensity * (1 + lvl * 0.18);
     cu.uAccentMix.value = p.accentMix;
 
     const coreScale = pulse * (1 + lvl * 0.08 * p.wave);
@@ -570,7 +598,7 @@ export class HoloEngine {
 
     // Halo
     const gm = this.glow.material as THREE.SpriteMaterial;
-    gm.opacity = p.glow * (0.32 + lvl * 0.3);
+    gm.opacity = p.glow * (0.3 + lvl * 0.16);
     gm.color.setRGB(...p.color);
     this.glow.scale.setScalar(3.3 * pulse + lvl * 0.9);
 
@@ -584,6 +612,21 @@ export class HoloEngine {
       const c = u.uColor.value as THREE.Color;
       if (r.spec.accent) c.setRGB(...p.color).lerp(new THREE.Color(...p.accent), 0.5 * p.accentMix);
       else c.setRGB(...p.color);
+    }
+
+    // Ondas de choque
+    for (const s of this.shock) {
+      if (s.t >= 1) {
+        s.mesh.visible = false;
+        continue;
+      }
+      s.t += dt * 0.9;
+      const k = Math.max(0, s.t);
+      s.mesh.visible = s.t > 0;
+      s.mesh.scale.setScalar(1.3 + k * 2.4);
+      s.mat.uniforms.uOpacity.value = Math.pow(1 - k, 2) * 0.9;
+      s.mat.uniforms.uRot.value += dt * 0.2;
+      (s.mat.uniforms.uColor.value as THREE.Color).setRGB(...p.color).lerp(new THREE.Color(1, 1, 1), 0.3);
     }
 
     // Ondas circulares
@@ -654,7 +697,7 @@ export class HoloEngine {
 
     this.grid.rotation.y += dt * 0.03 * p.spin;
 
-    this.bloom.strength = p.bloom * (0.62 + lvl * 0.22);
+    this.bloom.strength = p.bloom * (0.6 + lvl * 0.12);
     this.composer.render();
   }
 }

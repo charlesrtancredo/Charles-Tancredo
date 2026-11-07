@@ -1501,11 +1501,238 @@ input {
   color: var(--cyan);
 }
 
+/* ---------- Voz / configurações ---------- */
+
+.voice-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.voice-badge i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+.voice-badge.e-realtime i {
+  background: var(--green);
+  box-shadow: 0 0 8px var(--green);
+}
+.voice-badge.e-local i {
+  background: var(--cyan);
+  box-shadow: 0 0 8px var(--cyan);
+}
+.voice-badge.c-connecting i {
+  background: var(--gold);
+  box-shadow: 0 0 8px var(--gold);
+  animation: blink 0.5s ease-in-out infinite;
+}
+.voice-badge.c-on {
+  color: var(--green);
+}
+.gear {
+  width: 36px;
+  height: 36px;
+  margin-right: -8px;
+  color: var(--muted);
+}
+.gear:hover {
+  color: var(--cyan);
+}
+
+.transcript__notice {
+  align-self: center;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--gold);
+  padding: 4px 10px;
+  border: 1px solid rgba(255, 193, 94, 0.3);
+  background: rgba(40, 26, 4, 0.45);
+  border-radius: 6px;
+  text-align: center;
+  animation: tile-in 0.3s both;
+}
+
+.mic.in-call {
+  background: radial-gradient(circle at 50% 40%, rgba(77, 255, 195, 0.4), rgba(10, 91, 255, 0.35) 60%, rgba(3, 22, 38, 0.8));
+  border-color: rgba(77, 255, 195, 0.6);
+}
+.mic.in-call .mic__ring {
+  border-color: var(--green);
+}
+.mic.c-connecting .mic__ring {
+  opacity: 1;
+  border-color: transparent;
+  border-top-color: var(--gold);
+  animation: spin 0.8s linear infinite;
+}
+
+.small {
+  font-size: 13px;
+  line-height: 1.4;
+  margin: 10px 0 0;
+}
+.radio-list {
+  display: grid;
+  gap: 8px;
+}
+.radio {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  text-align: left;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(4, 24, 40, 0.5);
+  transition:
+    border-color 0.2s,
+    background 0.2s;
+}
+.radio b {
+  display: block;
+  font-size: 15px;
+  font-weight: 600;
+}
+.radio small {
+  display: block;
+  font-size: 12.5px;
+  color: var(--muted);
+  line-height: 1.3;
+}
+.radio__dot {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  border-radius: 50%;
+  border: 1px solid var(--line-strong);
+}
+.radio.on {
+  border-color: var(--cyan);
+  background: rgba(43, 217, 255, 0.1);
+}
+.radio.on .radio__dot {
+  border-color: var(--cyan);
+  background: radial-gradient(circle, var(--cyan) 0 40%, transparent 45%);
+  box-shadow: 0 0 8px rgba(43, 217, 255, 0.5);
+}
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  font-size: 14.5px;
+  cursor: pointer;
+}
+.toggle input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.toggle__ui {
+  flex: none;
+  width: 42px;
+  height: 24px;
+  border-radius: 12px;
+  border: 1px solid var(--line-strong);
+  background: rgba(4, 24, 40, 0.6);
+  position: relative;
+  transition: background 0.2s;
+}
+.toggle__ui::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--muted);
+  transition:
+    transform 0.2s,
+    background 0.2s;
+}
+.toggle input:checked + .toggle__ui {
+  background: rgba(43, 217, 255, 0.25);
+}
+.toggle input:checked + .toggle__ui::after {
+  transform: translateX(18px);
+  background: var(--cyan);
+  box-shadow: 0 0 8px var(--cyan);
+}
+.toggle input:focus-visible + .toggle__ui {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+}
+.field {
+  display: block;
+  margin-bottom: 10px;
+}
+.field span {
+  display: block;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 5px;
+}
+.field input {
+  width: 100%;
+  height: 44px;
+  padding: 0 12px;
+  font-size: 16px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(1, 10, 18, 0.7);
+  outline: 0;
+}
+.field input:focus {
+  border-color: var(--line-strong);
+}
+.primary-btn {
+  width: 100%;
+  height: 46px;
+  border-radius: 10px;
+  font-family: var(--font-display);
+  font-size: 11.5px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--bg);
+  background: linear-gradient(90deg, var(--cyan), var(--cyan-2));
+  box-shadow: 0 0 18px rgba(43, 217, 255, 0.35);
+}
+.primary-btn:disabled {
+  opacity: 0.6;
+}
+.primary-btn.ghost {
+  margin-top: 12px;
+  color: var(--cyan);
+  background: transparent;
+  border: 1px solid var(--line-strong);
+  box-shadow: none;
+}
+
 /* ==========================================================================
    Responsivo
    ========================================================================== */
 
 /* iPhones menores (SE / mini) */
+@media (max-width: 440px) {
+  .voice-badge {
+    font-size: 0;
+    gap: 0;
+  }
+  .brand small {
+    letter-spacing: 0.1em;
+  }
+}
+
 @media (max-width: 380px) {
   .brand small {
     display: none;

@@ -7,8 +7,9 @@ import { ModuleSheet, type SheetView } from './components/ModuleSheet';
 import { TopBar } from './components/TopBar';
 import { Transcript } from './components/Transcript';
 import { AgendaWidget, CompactCards, FinanceWidget, StrategyWidget, SystemWidget, TasksWidget } from './components/Widgets';
-import { pingServer } from './lib/api';
-import { useAssistant } from './state/useAssistant';
+import { pingServer, type ServerInfo } from './lib/api';
+import { useSettings } from './lib/settings';
+import { resolveEngine, useAssistant } from './state/useAssistant';
 import type { AssistantState, ModuleId } from './state/types';
 
 export default function App() {
@@ -16,19 +17,22 @@ export default function App() {
   const [booted, setBooted] = useState(false);
   const [sheet, setSheet] = useState<SheetView>(null);
   const [fps, setFps] = useState(0);
-  const [latency, setLatency] = useState<number | null>(null);
+  const [server, setServer] = useState<ServerInfo | null>(null);
   const [webglFailed, setWebglFailed] = useState(false);
+  const settings = useSettings();
 
   const openModule = useCallback((m: ModuleId) => setSheet(m), []);
-  const assistant = useAssistant({ onOpenModule: openModule });
+  const closeSheet = useCallback(() => setSheet(null), []);
+  const assistant = useAssistant({ onOpenModule: openModule, onCloseModule: closeSheet, server });
   const { state } = assistant;
+  const engine = assistant.activeEngine ?? resolveEngine(settings, server);
 
-  // Latência real até o backend (quando estiver rodando).
+  // Estado do backend (latência real + serviços configurados).
   useEffect(() => {
     let alive = true;
     const run = async () => {
-      const ms = await pingServer();
-      if (alive) setLatency(ms);
+      const info = await pingServer();
+      if (alive) setServer(info);
     };
     run();
     const id = window.setInterval(run, 15_000);
@@ -36,30 +40,30 @@ export default function App() {
       alive = false;
       window.clearInterval(id);
     };
-  }, []);
+  }, [settings.serverUrl]);
 
   // Atalhos de teclado (desktop): 1-4 alternam estados, espaço ativa a escuta.
+  const assistantRef = useRef(assistant);
+  assistantRef.current = assistant;
   useEffect(() => {
     const map: Record<string, AssistantState> = { '1': 'idle', '2': 'listening', '3': 'thinking', '4': 'speaking' };
     const onKey = (e: KeyboardEvent) => {
       if ((e.target as HTMLElement)?.tagName === 'INPUT') return;
-      if (map[e.key]) assistant.forceState(map[e.key]);
+      const a = assistantRef.current;
+      if (map[e.key]) a.forceState(map[e.key]);
       if (e.code === 'Space' && !sheet) {
         e.preventDefault();
-        assistant.toggleListening();
+        a.toggleListening();
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [assistant, sheet]);
+  }, [sheet]);
 
   const onBootDone = useCallback(() => {
     setBooted(true);
-    assistant.boot();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    assistantRef.current.boot();
   }, []);
-
-  const closeSheet = useCallback(() => setSheet(null), []);
 
   return (
     <div className={`app s-${state} ${booted ? 'booted' : ''}`}>
@@ -67,9 +71,10 @@ export default function App() {
         <HoloCanvas
           state={state}
           focusRef={coreRef}
-          onCoreTap={assistant.toggleListening}
+          onCoreTap={assistant.tapCore}
           onFps={setFps}
           onError={() => setWebglFailed(true)}
+          getLevel={assistant.getLevel}
         />
       ) : (
         <div className="holo-fallback" />
@@ -77,11 +82,11 @@ export default function App() {
       <div className="fx-scanlines" aria-hidden />
       <div className="fx-vignette" aria-hidden />
 
-      <TopBar state={state} />
+      <TopBar state={state} engine={engine} conn={assistant.conn} onSettings={() => setSheet('settings')} />
 
       <main className="stage">
         <aside className="side side--left">
-          <SystemWidget state={state} fps={fps} latency={latency} />
+          <SystemWidget state={state} fps={fps} latency={server?.latency ?? null} />
           <StrategyWidget onOpen={openModule} />
         </aside>
         <section className="core-zone" ref={coreRef}>
@@ -95,9 +100,22 @@ export default function App() {
       </main>
 
       <div className="bottom">
-        <Transcript state={state} live={assistant.live} interim={assistant.interim} messages={assistant.messages} />
+        <Transcript
+          state={state}
+          live={assistant.live}
+          interim={assistant.interim}
+          notice={assistant.notice}
+          inSession={assistant.conn === 'on'}
+          messages={assistant.messages}
+        />
         <CompactCards onOpen={openModule} fps={fps} state={state} />
-        <Dock state={state} onSend={assistant.send} onMic={assistant.toggleListening} onModules={() => setSheet('menu')} />
+        <Dock
+          state={state}
+          conn={assistant.conn}
+          onSend={assistant.send}
+          onMic={assistant.toggleListening}
+          onModules={() => setSheet('menu')}
+        />
       </div>
 
       <ModuleSheet
@@ -110,6 +128,10 @@ export default function App() {
         }}
         onForceState={assistant.forceState}
         state={state}
+        engine={engine}
+        conn={assistant.conn}
+        server={server}
+        onServerChange={setServer}
       />
 
       {!booted && <BootSequence onDone={onBootDone} />}

@@ -1,0 +1,51 @@
+# Publica o PWA (somente frontend) no GitHub Pages com HTTPS.
+# Pré-requisito único: Settings → Pages → Source: "GitHub Actions".
+# URL: https://<usuário>.github.io/<repositório>/
+name: Publicar PWA (GitHub Pages)
+
+on:
+  push:
+    branches: [main, claude/jarvis-holographic-assistant-ouag4l]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - name: Build do PWA
+        run: npm run build --workspace web
+        env:
+          BASE_PATH: /${{ github.event.repository.name }}/
+          # Opcional: URL do backend publicado (Settings → Secrets and variables → Actions → Variables)
+          VITE_API_URL: ${{ vars.JARVIS_API_URL }}
+      - run: cp web/dist/index.html web/dist/404.html
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

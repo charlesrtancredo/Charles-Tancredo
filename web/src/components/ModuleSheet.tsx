@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react';
 import { AGENDA, FINANCE, LIFE_AREAS, MEMORIES, TASKS, fmtBRL, fmtTime, isSameDay, type Task } from '../data/mock';
 import { STATE_LABEL, type AssistantState, type ModuleId } from '../state/types';
+import type { ServerInfo } from '../lib/api';
+import type { ConnStatus, VoiceEngine } from '../state/useAssistant';
 import { Radar, Ring, SegBar, Sparkline } from './charts';
 import { CloseIcon, MODULE_ICON } from './icons';
+import { SettingsView } from './SettingsView';
 
 export const MODULES: { id: ModuleId; name: string; desc: string; code: string }[] = [
   { id: 'voice', name: 'Assistente de voz', desc: 'Conversa natural em tempo real', code: 'VOX' },
@@ -14,7 +17,7 @@ export const MODULES: { id: ModuleId; name: string; desc: string; code: string }
   { id: 'commands', name: 'Central de comandos', desc: 'Atalhos e diagnóstico', code: 'CMD' },
 ];
 
-export type SheetView = ModuleId | 'menu' | null;
+export type SheetView = ModuleId | 'menu' | 'settings' | null;
 
 interface Props {
   view: SheetView;
@@ -23,9 +26,13 @@ interface Props {
   onCommand: (text: string) => void;
   onForceState: (s: AssistantState) => void;
   state: AssistantState;
+  engine: VoiceEngine;
+  conn: ConnStatus;
+  server: ServerInfo | null;
+  onServerChange: (s: ServerInfo | null) => void;
 }
 
-export function ModuleSheet({ view, onClose, onNavigate, onCommand, onForceState, state }: Props) {
+export function ModuleSheet({ view, onClose, onNavigate, onCommand, onForceState, state, engine, conn, server, onServerChange }: Props) {
   const [shown, setShown] = useState<SheetView>(view);
   useEffect(() => {
     if (view) setShown(view);
@@ -38,7 +45,8 @@ export function ModuleSheet({ view, onClose, onNavigate, onCommand, onForceState
     return () => window.removeEventListener('keydown', onKey);
   }, [view, onClose]);
 
-  const mod = MODULES.find((m) => m.id === shown);
+  const mod =
+    shown === 'settings' ? { id: 'settings', name: 'Configurações', code: 'CFG' } : MODULES.find((m) => m.id === shown);
   const open = view !== null;
 
   return (
@@ -72,7 +80,8 @@ export function ModuleSheet({ view, onClose, onNavigate, onCommand, onForceState
           {shown === 'tasks' && <TasksView />}
           {shown === 'strategy' && <StrategyView />}
           {shown === 'memory' && <MemoryView />}
-          {shown === 'voice' && <VoiceView state={state} onForceState={onForceState} />}
+          {shown === 'voice' && <VoiceView state={state} onForceState={onForceState} engine={engine} conn={conn} onNavigate={onNavigate} />}
+          {shown === 'settings' && <SettingsView server={server} onServerChange={onServerChange} />}
           {shown === 'commands' && <CommandsView onCommand={onCommand} onForceState={onForceState} state={state} />}
         </div>
       </div>
@@ -301,9 +310,41 @@ function StateSwitcher({ state, onForceState }: { state: AssistantState; onForce
   );
 }
 
-function VoiceView({ state, onForceState }: { state: AssistantState; onForceState: (s: AssistantState) => void }) {
+const ENGINE_TXT: Record<VoiceEngine, string> = {
+  realtime: 'Tempo real · OpenAI via servidor seguro',
+  local: 'Voz local · reconhecimento e fala do dispositivo',
+  demo: 'Demonstração · escuta simulada',
+};
+
+function VoiceView({
+  state,
+  onForceState,
+  engine,
+  conn,
+  onNavigate,
+}: {
+  state: AssistantState;
+  onForceState: (s: AssistantState) => void;
+  engine: VoiceEngine;
+  conn: ConnStatus;
+  onNavigate: (v: SheetView) => void;
+}) {
   return (
     <div className="stack">
+      <section className="block">
+        <h3>Canal de voz</h3>
+        <div className="kv">
+          <span>{ENGINE_TXT[engine]}</span>
+          <b className={`mono ${conn === 'on' ? 'ok' : ''}`}>{conn === 'on' ? 'ATIVO' : conn === 'connecting' ? 'CONECTANDO' : 'EM ESPERA'}</b>
+        </div>
+        <p className="muted small">
+          Toque no microfone ou no núcleo para falar. No tempo real a conversa é contínua: fale naturalmente, interrompa quando quiser e toque
+          no núcleo para silenciar a resposta.
+        </p>
+        <button className="primary-btn ghost" onClick={() => onNavigate('settings')}>
+          Configurar voz e servidor
+        </button>
+      </section>
       <section className="block">
         <h3>Estado do núcleo</h3>
         <StateSwitcher state={state} onForceState={onForceState} />
@@ -312,10 +353,11 @@ function VoiceView({ state, onForceState }: { state: AssistantState; onForceStat
         <h3>Roadmap da voz</h3>
         <ul className="roadmap">
           <li className="done">Núcleo holográfico reativo a estados</li>
-          <li>Captura de microfone com analisador de áudio</li>
-          <li>Sessão de voz em tempo real via backend (token efêmero)</li>
-          <li>Voz pt-BR com personalidade de mordomo</li>
-          <li>Interrupção natural (barge-in) e palavra de ativação</li>
+          <li className="done">Microfone real animando o núcleo (analisador de áudio)</li>
+          <li className="done">Sessão de voz em tempo real via backend (credencial efêmera)</li>
+          <li className="done">Voz pt-BR com personalidade de mordomo</li>
+          <li className="done">Interrupção natural e painéis abertos por voz</li>
+          <li>Palavra de ativação ("Jarvis") e memória de longo prazo</li>
         </ul>
       </section>
     </div>

@@ -1,8 +1,22 @@
+import type { ConnStatus, VoiceEngine } from '../state/useAssistant';
 import { STATE_LABEL, type AssistantState } from '../state/types';
-import { ReactorLogo } from './icons';
+import { GearIcon, ReactorLogo } from './icons';
 import { useNow } from './useNow';
 
-export function TopBar({ state }: { state: AssistantState }) {
+const ENGINE_LABEL: Record<VoiceEngine, string> = {
+  realtime: 'Tempo real',
+  local: 'Voz local',
+  demo: 'Demonstração',
+};
+
+interface Props {
+  state: AssistantState;
+  engine: VoiceEngine;
+  conn: ConnStatus;
+  onSettings: () => void;
+}
+
+export function TopBar({ state, engine, conn, onSettings }: Props) {
   const now = new Date(useNow(1000));
   const time = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
   const sec = String(now.getSeconds()).padStart(2, '0');
@@ -18,6 +32,10 @@ export function TopBar({ state }: { state: AssistantState }) {
       </div>
       <div className="topbar__date">{date}</div>
       <div className="topbar__right">
+        <span className={`voice-badge e-${engine} c-${conn}`} title="Motor de voz">
+          <i />
+          {conn === 'connecting' ? 'Conectando' : ENGINE_LABEL[engine]}
+        </span>
         <span className={`status-pill s-${state}`}>
           <i />
           {STATE_LABEL[state]}
@@ -26,6 +44,9 @@ export function TopBar({ state }: { state: AssistantState }) {
           {time}
           <em>{sec}</em>
         </span>
+        <button className="icon-btn gear" onClick={onSettings} aria-label="Configurações">
+          <GearIcon size={20} />
+        </button>
       </div>
     </header>
   );
